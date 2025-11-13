@@ -1,5 +1,7 @@
 /**
- * Function to calculate and display the EM Report Schedule based on user input.
+ * Function to calculate and display the EM Report Schedule based on user input, 
+ * incorporating all revisions: custom labels, DD Mon YYYY #:# AM/PM format, 
+ * separate columns, and adjusted Aseptic product logic.
  */
 function calculateEMReports() {
     // 1. Get user input
@@ -47,15 +49,14 @@ function calculateEMReports() {
 
     if (productType === 'Aseptic') {
         // Aseptic Logic: Summary every 4 hours, starting 4 hours *before* filling starts.
-        // STOP GENERATING NEW SETS ONCE THE START OF THE SET IS AFTER THE END TIME.
+        // NO 'After Production' set generated.
 
         // 3a. Calculate the **first** report time (4 hours before start)
         let currentTime = new Date(startTime.getTime() - fourHoursMs);
         
         let reportSetCount = 1;
         
-        // Revised Loop Condition: Continue only if the start time of the current block is BEFORE the end time.
-        // This effectively removes any dedicated 'After Production' sets.
+        // Loop stops when the start of the current 4-hour set reaches or exceeds the end time.
         while (currentTime.getTime() < endTime.getTime()) {
             
             const reportEnd = new Date(currentTime.getTime() + fourHoursMs);
@@ -66,7 +67,7 @@ function calculateEMReports() {
             if (reportEnd.getTime() <= startTime.getTime()) {
                 timeCategory = 'Before Production'; 
             } else {
-                // If the set starts before or during filling, it's 'During Production'
+                // All sets that overlap with or are immediately before the end of the filling time
                 timeCategory = 'During Production';
             }
             
@@ -82,7 +83,7 @@ function calculateEMReports() {
         }
 
     } else if (productType === 'Terminal') {
-        // Terminal Logic: Only 4 hours *before* start AND 4 hours *after* end. (This logic remains unchanged)
+        // Terminal Logic: 4 hours *before* start AND 4 hours *after* end.
 
         // 1. 4 Hours Before Start
         const beforeStart = new Date(startTime.getTime() - fourHoursMs);
@@ -108,6 +109,7 @@ function calculateEMReports() {
         
         // Group reports by category and date for the summary count
         const summary = reportData.reduce((acc, report) => {
+            // Use the start date of the set for the date count
             const dateStr = formatDate(report.start);
             if (!acc[report.category]) {
                 acc[report.category] = {};
@@ -162,4 +164,4 @@ function calculateEMReports() {
     } else {
         resultsDiv.innerHTML += '<p>No reports generated. Check your input and product type logic.</p>';
     }
-            }
+}
