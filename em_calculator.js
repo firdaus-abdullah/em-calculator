@@ -47,13 +47,16 @@ function calculateEMReports() {
 
     if (productType === 'Aseptic') {
         // Aseptic Logic: Summary every 4 hours, starting 4 hours *before* filling starts.
+        // STOP GENERATING NEW SETS ONCE THE START OF THE SET IS AFTER THE END TIME.
 
         // 3a. Calculate the **first** report time (4 hours before start)
         let currentTime = new Date(startTime.getTime() - fourHoursMs);
         
         let reportSetCount = 1;
         
-        while (currentTime.getTime() < (endTime.getTime() + fourHoursMs)) {
+        // Revised Loop Condition: Continue only if the start time of the current block is BEFORE the end time.
+        // This effectively removes any dedicated 'After Production' sets.
+        while (currentTime.getTime() < endTime.getTime()) {
             
             const reportEnd = new Date(currentTime.getTime() + fourHoursMs);
             
@@ -62,9 +65,8 @@ function calculateEMReports() {
             // Determine the category based on where the 4-hour slot falls
             if (reportEnd.getTime() <= startTime.getTime()) {
                 timeCategory = 'Before Production'; 
-            } else if (currentTime.getTime() >= endTime.getTime()) {
-                timeCategory = 'After Production';
             } else {
+                // If the set starts before or during filling, it's 'During Production'
                 timeCategory = 'During Production';
             }
             
@@ -80,7 +82,7 @@ function calculateEMReports() {
         }
 
     } else if (productType === 'Terminal') {
-        // Terminal Logic: Only 4 hours *before* start AND 4 hours *after* end.
+        // Terminal Logic: Only 4 hours *before* start AND 4 hours *after* end. (This logic remains unchanged)
 
         // 1. 4 Hours Before Start
         const beforeStart = new Date(startTime.getTime() - fourHoursMs);
@@ -115,5 +117,49 @@ function calculateEMReports() {
             return acc;
         }, {});
 
-        // Build the Summary Report (Total summary date based on date for each
-    
+        // Build the Summary Report
+        let summaryHTML = '<h4>Summary of Sets per Date:</h4><ul>';
+        for (const category in summary) {
+            summaryHTML += `<li><strong>${category}:</strong><ul>`;
+            for (const date in summary[category]) {
+                summaryHTML += `<li>${date}: ${summary[category][date]} Set(s)</li>`;
+            }
+            summaryHTML += `</ul></li>`;
+        }
+        summaryHTML += '</ul>';
+
+        resultsDiv.innerHTML += summaryHTML;
+        resultsDiv.innerHTML += `<p>Total Summary Report Sets Required: <strong>${reportData.length}</strong></p>`;
+        
+        // Build the Detailed Schedule Table with SEPARATE START AND END COLUMNS
+        let tableHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th>Set #</th>
+                        <th>Start Date/Time</th>
+                        <th>End Date/Time</th>
+                        <th>Category</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        reportData.forEach(report => {
+            tableHTML += `
+                <tr>
+                    <td>${report.set}</td>
+                    <td>${formatDateTime(report.start)}</td>
+                    <td>${formatDateTime(report.end)}</td>
+                    <td>${report.category}</td>
+                </tr>
+            `;
+        });
+
+        tableHTML += '</tbody></table>';
+        resultsDiv.innerHTML += tableHTML;
+
+    } else {
+        resultsDiv.innerHTML += '<p>No reports generated. Check your input and product type logic.</p>';
+    }
+            }
