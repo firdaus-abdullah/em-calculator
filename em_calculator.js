@@ -57,13 +57,15 @@ function calculateEMReports() {
             
             const reportEnd = new Date(currentTime.getTime() + fourHoursMs);
             
-            let timeCategory = 'During Production';
+            let timeCategory;
             
             // Determine the category based on where the 4-hour slot falls
             if (reportEnd.getTime() <= startTime.getTime()) {
-                timeCategory = 'Before Production';
+                timeCategory = 'Before Production'; 
             } else if (currentTime.getTime() >= endTime.getTime()) {
                 timeCategory = 'After Production';
+            } else {
+                timeCategory = 'During Production';
             }
             
             reportData.push({
@@ -102,7 +104,7 @@ function calculateEMReports() {
     // 4. Display Results and Calculate Summary
     if (reportData.length > 0) {
         
-        // Group reports by category for the summary count
+        // Group reports by category and date for the summary count
         const summary = reportData.reduce((acc, report) => {
             const dateStr = formatDate(report.start);
             if (!acc[report.category]) {
@@ -113,37 +115,5 @@ function calculateEMReports() {
             return acc;
         }, {});
 
-        // Build the Summary Report
-        let summaryHTML = '<h4>Summary of Sets per Date:</h4><ul>';
-        for (const category in summary) {
-            summaryHTML += `<li><strong>${category}:</strong><ul>`;
-            for (const date in summary[category]) {
-                summaryHTML += `<li>${date}: ${summary[category][date]} Set(s)</li>`;
-            }
-            summaryHTML += `</ul></li>`;
-        }
-        summaryHTML += '</ul>';
-
-        resultsDiv.innerHTML += summaryHTML;
-        resultsDiv.innerHTML += `<p>Total Summary Report Sets Required: <strong>${reportData.length}</strong></p>`;
-        
-        // Build the Detailed Schedule Table
-        let tableHTML = '<table><thead><tr><th>Set #</th><th>Time Interval (Start - End)</th><th>Category</th></tr></thead><tbody>';
-
-        reportData.forEach(report => {
-            tableHTML += `
-                <tr>
-                    <td>${report.set}</td>
-                    <td>${formatDateTime(report.start)} - ${formatDateTime(report.end)}</td>
-                    <td>${report.category}</td>
-                </tr>
-            `;
-        });
-
-        tableHTML += '</tbody></table>';
-        resultsDiv.innerHTML += tableHTML;
-
-    } else {
-        resultsDiv.innerHTML += '<p>No reports generated. Check your input and product type logic.</p>';
-    }
-}
+        // Build the Summary Report (Total summary date based on date for each
+    
