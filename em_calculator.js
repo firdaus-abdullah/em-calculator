@@ -26,14 +26,20 @@ function calculateEMReports() {
         return;
     }
 
-    // 3. Helper function for date/time formatting
-    const formatter = new Intl.DateTimeFormat('en-US', {
-        year: 'numeric', month: '2-digit', day: '2-digit', 
-        hour: '2-digit', minute: '2-digit', 
-        hour12: false // Use 24-hour format
+    // 3. Helper functions for new date/time formatting (dd mmm yyyy and #:# AM/PM)
+    const dateFormatter = new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit', month: 'short', year: 'numeric' 
+    });
+    
+    const timeFormatter = new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric', minute: '2-digit', hour12: true
     });
 
-    const formatTime = (date) => formatter.format(date).replace(',', '');
+    const formatDate = (date) => dateFormatter.format(date).replace(/ /g, ' '); // dd mmm yyyy
+    const formatTime = (date) => timeFormatter.format(date).replace(':', ':');   // #:## AM/PM
+
+    // Function to combine date and time for table display
+    const formatDateTime = (date) => `${formatDate(date)} ${formatTime(date)}`;
     
     let reportData = [];
 
@@ -47,24 +53,23 @@ function calculateEMReports() {
         
         let reportSetCount = 1;
         
-        // Loop runs until the start of the current 4-hour slot is after the end of the required period 
-        // (which is 4 hours after filling stops).
         while (currentTime.getTime() < (endTime.getTime() + fourHoursMs)) {
             
             const reportEnd = new Date(currentTime.getTime() + fourHoursMs);
             
-            let timeCategory = 'During Filling';
-            // Determine the category
+            let timeCategory = 'During Production';
+            
+            // Determine the category based on where the 4-hour slot falls
             if (reportEnd.getTime() <= startTime.getTime()) {
-                timeCategory = 'Before Filling Start (Initial)';
+                timeCategory = 'Before Production';
             } else if (currentTime.getTime() >= endTime.getTime()) {
-                timeCategory = 'After Filling End (Final)';
+                timeCategory = 'After Production';
             }
             
             reportData.push({
                 set: reportSetCount++,
-                start: formatTime(currentTime),
-                end: formatTime(reportEnd),
+                start: currentTime,
+                end: reportEnd,
                 category: timeCategory
             });
 
@@ -79,33 +84,57 @@ function calculateEMReports() {
         const beforeStart = new Date(startTime.getTime() - fourHoursMs);
         reportData.push({
             set: 1,
-            start: formatTime(beforeStart),
-            end: formatTime(startTime),
-            category: 'Before Filling Start (Initial)'
+            start: beforeStart,
+            end: startTime,
+            category: 'Before Production'
         });
 
         // 2. 4 Hours After End
         const afterEnd = new Date(endTime.getTime() + fourHoursMs);
         reportData.push({
             set: 2,
-            start: formatTime(endTime),
-            end: formatTime(afterEnd),
-            category: 'After Filling End (Final)'
+            start: endTime,
+            end: afterEnd,
+            category: 'After Production'
         });
     }
     
-    // 4. Display Results
+    // 4. Display Results and Calculate Summary
     if (reportData.length > 0) {
         
+        // Group reports by category for the summary count
+        const summary = reportData.reduce((acc, report) => {
+            const dateStr = formatDate(report.start);
+            if (!acc[report.category]) {
+                acc[report.category] = {};
+            }
+            // Count sets per date per category
+            acc[report.category][dateStr] = (acc[report.category][dateStr] || 0) + 1;
+            return acc;
+        }, {});
+
+        // Build the Summary Report
+        let summaryHTML = '<h4>Summary of Sets per Date:</h4><ul>';
+        for (const category in summary) {
+            summaryHTML += `<li><strong>${category}:</strong><ul>`;
+            for (const date in summary[category]) {
+                summaryHTML += `<li>${date}: ${summary[category][date]} Set(s)</li>`;
+            }
+            summaryHTML += `</ul></li>`;
+        }
+        summaryHTML += '</ul>';
+
+        resultsDiv.innerHTML += summaryHTML;
         resultsDiv.innerHTML += `<p>Total Summary Report Sets Required: <strong>${reportData.length}</strong></p>`;
         
+        // Build the Detailed Schedule Table
         let tableHTML = '<table><thead><tr><th>Set #</th><th>Time Interval (Start - End)</th><th>Category</th></tr></thead><tbody>';
 
         reportData.forEach(report => {
             tableHTML += `
                 <tr>
                     <td>${report.set}</td>
-                    <td>${report.start} - ${report.end}</td>
+                    <td>${formatDateTime(report.start)} - ${formatDateTime(report.end)}</td>
                     <td>${report.category}</td>
                 </tr>
             `;
