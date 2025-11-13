@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EM Report Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        label {
+            display: block;
+            margin: 10px 0 5px;
+            font-weight: bold;
+        }
+        input[type="datetime-local"], select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .results {
+            margin-top: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #e9ecef;
+        }
+        .results h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🏭 EM Report Calculator</h1>
+    
+    <label for="productType">Product Type:</label>
+    <select id="productType">
+        <option value="Aseptic">Aseptic Product</option>
+        <option value="Terminal">Terminal Product</option>
+    </select>
+
+    <label for="startTime">Start Filling Date and Time:</label>
+    <input type="datetime-local" id="startTime">
+
+    <label for="endTime">End Filling Date and Time:</label>
+    <input type="datetime-local" id="endTime">
+
+    <button onclick="calculateEMReports()">Calculate Reports</button>
+
+    <div class="results" id="results">
+        <h3>Report Schedule:</h3>
+        <p>Enter details and click 'Calculate Reports' to see the schedule.</p>
+    </div>
+</div>
+
+<script>
+    function calculateEMReports() {
+        // 1. Get user input
+        const productType = document.getElementById('productType').value;
+        const startTimeStr = document.getElementById('startTime').value;
+        const endTimeStr = document.getElementById('endTime').value;
+        const resultsDiv = document.getElementById('results');
+
+        // Reset previous results
+        resultsDiv.innerHTML = '<h3>Report Schedule:</h3>';
+
+        // 2. Validate input
+        if (!startTimeStr || !endTimeStr) {
+            resultsDiv.innerHTML += '<p style="color: red;">Please enter both Start and End Filling Date and Time.</p>';
+            return;
+        }
+
+        const startTime = new Date(startTimeStr);
+        const endTime = new Date(endTimeStr);
+
+        if (startTime >= endTime) {
+            resultsDiv.innerHTML += '<p style="color: red;">Start Time must be before End Time.</p>';
+            return;
+        }
+
+        // 3. Helper function for date/time formatting
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            year: 'numeric', month: '2-digit', day: '2-digit', 
+            hour: '2-digit', minute: '2-digit', 
+            hour12: false // Use 24-hour format
+        });
+
+        const formatTime = (date) => formatter.format(date).replace(',', '');
+        
+        let reportData = [];
+
+        // --- Core Logic ---
+
+        if (productType === 'Aseptic') {
+            // Aseptic Product Logic: Summary every 4 hours, starting 4 hours *before* filling starts.
+            // This covers 'before' and 'during' the process.
+
+            // 3a. Calculate the **first** report time (4 hours before start)
+            let currentTime = new Date(startTime.getTime() - (4 * 60 * 60 * 1000));
+            
+            // 3b. Loop through until the last report time *after* the end time
+            let reportSetCount = 1;
+            
+            // Continue calculating 4-hour blocks as long as the current time is before or equal to the end time
+            // We add an extra 4-hour block at the end to ensure the *end* of the last report block is after filling stops.
+            while (currentTime.getTime() < (endTime.getTime() + (4 * 60 * 60 * 1000))) {
+                
+                const reportEnd = new Date(currentTime.getTime() + (4 * 60 * 60 * 1000));
+                
+                let timeCategory = 'During Filling';
+                if (reportEnd <= startTime) {
+                    timeCategory = 'Before Filling Start (Initial)';
+                } else if (currentTime >= endTime) {
+                    timeCategory = 'After Filling End (Final)';
+                }
+                
+                reportData.push({
+                    set: reportSetCount++,
+                    start: formatTime(currentTime),
+                    end: formatTime(reportEnd),
+                    category: timeCategory
+                });
+
+                // Move to the next 4-hour window
+                currentTime = reportEnd;
+            }
+
+        } else if (productType === 'Terminal') {
+            // Terminal Product Logic: Only 4 hours *before* start AND 4 hours *after* end.
+
+            // 1. 4 Hours Before Start
+            const beforeStart = new Date(startTime.getTime() - (4 * 60 * 60 * 1000));
+            reportData.push({
+                set: 1,
+                start: formatTime(beforeStart),
+                end: formatTime(startTime),
+                category: 'Before Filling Start (Initial)'
+            });
+
+            // 2. 4 Hours After End
+            const afterEnd = new Date(endTime.getTime() + (4 * 60 * 60 * 1000));
+            reportData.push({
+                set: 2,
+                start: formatTime(endTime),
+                end: formatTime(afterEnd),
+                category: 'After Filling End (Final)'
+            });
+        }
+        
+        // 4. Display Results
+        if (reportData.length > 0) {
+            
+            resultsDiv.innerHTML += `<p>Total Summary Report Sets Required: <strong>${reportData.length}</strong></p>`;
+            
+            let tableHTML = '<table><thead><tr><th>Set #</th><th>Time Interval (Start - End)</th><th>Category</th></tr></thead><tbody>';
+
+            reportData.forEach(report => {
+                tableHTML += `
+                    <tr>
+                        <td>${report.set}</td>
+                        <td>${report.start} - ${report.end}</td>
+                        <td>${report.category}</td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += '</tbody></table>';
+            resultsDiv.innerHTML += tableHTML;
+
+        } else {
+            resultsDiv.innerHTML += '<p>No reports generated. Check your input and product type logic.</p>';
+        }
+    }
+</script>
+
+</body>
+</html>
